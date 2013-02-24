@@ -1,0 +1,80 @@
+#!/usr/bin/env ruby1.9
+# -*- coding: utf-8 -*-
+
+#
+# WebSocketサーバ
+#
+
+require 'em-websocket'
+require 'json'
+require 'base64'
+require 'RMagick'
+
+connections = []
+
+history = []
+
+puts 'start'
+
+$current_file = Dir.glob( 'public/pictures/orig/*.png' ).sort[-1]
+
+def save( data )
+  (content_type, data_base64 ) = data.split(',')
+  raise "unknown cotent-type #{content_type}" if content_type != 'data:image/png;base64'
+  data = Base64.decode64(data_base64)
+  filename = Time.now.strftime('%Y%m%d_%H%M%S.png')
+  $current_file = 'public/pictures/orig/'+filename
+  open( $current_file, 'wb' ){|f| f.write(data) }
+
+  # サムネイルの作成
+  Magick::ImageList.new($current_file).resize( 64, 64 ).write('public/pictures/thumb/'+filename)
+end
+
+EventMachine::WebSocket.start( :host=>'0.0.0.0', :port=>3002, :debug=>false ) do |ws|
+
+  ws.onopen do
+    puts "connect from #{ws}"
+    unless connections.index(ws)
+      connections << ws 
+      puts $current_file
+      ws.send( JSON.dump({type:'load', 
+                           file: $current_file && File.basename($current_file), 
+                           messagePool: history} ) )
+      connections.each do |c|
+#        c.send('login', connections.size ) 
+      end
+    end
+  end
+
+  ws.onmessage do |msg_str|
+    # puts "message: #{msg_str}"
+    msg = JSON.parse(msg_str)
+
+    case msg['type']
+    when 'clear'
+      history.clear
+      puts $current_file
+      $current_file = nil
+      puts $current_file
+      connections.each do |c|
+        c.send(msg_str) 
+      end
+    when 'save'
+      save msg['data']
+      history.clear
+    else
+      history << msg
+      connections.each do |c|
+        c.send(msg_str)
+      end
+    end
+  end
+
+  ws.onclose do 
+    puts 'close'
+  end
+
+  ws.onerror do |err|
+    puts err, err.backtrace
+  end
+end

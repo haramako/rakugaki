@@ -1,0 +1,6 @@
+pid: ./var/thin.pid
+log: ./logs/access.log
+port: 3001
+environment: development
+address: 0.0.0.0
+daemonize: true

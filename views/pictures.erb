@@ -1,0 +1,8 @@
+<ul>
+<% @files.each do |f| fname = File.basename(f) %>
+  <li>
+    <img src="/pictures/thumb/<%=fname%>" width="40" height="40" />
+    <a href="/pictures/orig/<%=fname%>"><%= fname %></a>
+  </li>
+<% end %>
+</ul>
